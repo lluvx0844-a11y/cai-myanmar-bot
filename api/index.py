@@ -19,7 +19,7 @@ GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')
 # --- Gemini (ဦးနှောက်) ကို Setup လုပ်တာ ---
 try:
     genai.configure(api_key=GEMINI_API_KEY)
-    model = genai.GenerativeModel('gemini-1.0-pro') # တည်ငြိမ်တဲ့ model ကိုပဲ သုံးမယ်
+    model = genai.GenerativeModel('gemini-2.5-pro') # တည်ငြိမ်တဲ့ model ကိုပဲ သုံးမယ်
     chat = model.start_chat(history=[])
 except Exception as e:
     logging.error(f"Failed to configure Gemini: {e}")
