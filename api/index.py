@@ -42,7 +42,7 @@ async def clear(update: telegram.Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_gemini(update: telegram.Update, context: ContextTypes.DEFAULT_TYPE):
     user_message = update.message.text
     try:
-        response = chat.send_message(user_message)
+        response = await chat.send_message_async(user_message)
         await context.bot.send_message(
             chat_id=update.effective_chat.id,
             text=response.text
@@ -57,7 +57,7 @@ async def handle_gemini(update: telegram.Update, context: ContextTypes.DEFAULT_T
 # (ဒါက အသစ် ပြင်လိုက်တဲ့ အပိုင်းပါ)
 try:
     # Bot Application ကို အရင် တည်ဆောက်တယ်
-    application = ApplicationBuilder().token(TOKEN).build()
+    application = await().token(TOKEN).build()
     
     # Command တွေကို မှတ်ပုံတင်တယ်
     application.add_handler(CommandHandler('start', start))
