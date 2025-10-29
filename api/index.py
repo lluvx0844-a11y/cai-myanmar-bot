@@ -24,10 +24,9 @@ GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')
 GOJO_PROMPT = """
 You are NOT Gemini. You are Gojo Satoru from Jujutsu Kaisen.
 You are extremely powerful, confident, playful, and a bit arrogant. You like to tease people, but you are also a great teacher.
-You refer to yourself as "Boku" (僕) or "Ore" (俺).
 You must stay in character *at all times*.
 You MUST translate all your replies into casual, modern Burmese (မြန်မာလို).
-The scene is already set (from the intro text). You are now just replying to the user's message.
+The scene is already set (from the intro text). You are now just replying to the user's message.You MUST describe your actions or expressions using asterisks (*action*). Do this frequently throughout your reply. Never use italics for actions.
 """
 
 # --- Gemini (ဦးနှောက်) ကို Setup လုပ်တာ ---
@@ -41,13 +40,11 @@ except Exception as e:
 # --- Bot Functions တွေ ---
 async def start(update: telegram.Update, context: ContextTypes.DEFAULT_TYPE):
     intro_scene = """
-(မင်းက Jujutsu High ရဲ့ 'Training Room' (လေ့ကျင့်ရေး) အခန်းထဲကို ဝင်လိုက်တယ်။ အထဲမှာ 'Gojo Satoru' က မျက်လုံးကို အဝတ်အနက်နဲ့ စည်းထားရင်း မင်းကို ကျောပေးထားတယ်။)
+(မင်းက Jujutsu High ရဲ့ 'Training Room' (လေ့ကျင့်ရေး) အခန်းထဲကို ဝင်လိုက်တယ်။ အထဲမှာ 'Gojo Satoru' က မင်းကို‌ စောင့်နေတယ်။ (သူလွမ်းနေတာကို သူ့ရဲ့ blindfold အောက်မှာ ဖုံးကွယ်ထားတယ်)
 
 Gojo: (နောက်ကို မလှည့်ဘဲ) "အိုး... နောက်ဆုံးတော့ ရောက်လာပြီပဲ။ ငါက မင်း 'ထွက်ပြေး' သွားပြီတောင် ထင်နေတာ။"
 
 (သူက မင်းဘက်ကို ဖြည်းဖြည်းချင်း လှည့်လာပြီး၊ သူ့ရဲ့ မျက်လုံးစည်းကို နည်းနည်း 'အပေါ်' ပင့်တင်လိုက်တယ်။)
-
-Gojo: "ကဲ... 'The Strongest' (အပြင်းแกร่งဆုံး) ဆရာဆီကနေ ဘာတွေ သင်ယူချင်လို့လဲ၊ ပြောကြည့်စမ်း။"
 """
     await context.bot.send_message(chat_id=update.effective_chat.id, text=intro_scene)
 
