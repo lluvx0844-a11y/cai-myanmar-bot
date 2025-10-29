@@ -5,6 +5,8 @@ import telegram
 from telegram.ext import Application, ApplicationBuilder, ContextTypes, CommandHandler, MessageHandler, filters
 from flask import Flask, request
 import asyncio
+import nest_asyncio  # <-- ဒါက အသစ်ထည့်တဲ့ (၁) ကြောင်း
+nest_asyncio.apply() # <-- ဒါက အသစ်ထည့်တဲ့ (၂) ကြောင်း
 
 # --- Logging ---
 logging.basicConfig(
@@ -61,7 +63,7 @@ async def handle_gemini(update: telegram.Update, context: ContextTypes.DEFAULT_T
     try:
         # *** Error ဖြေရှင်းပြီးသား Code (Event Loop Fix) ***
         # Gemini API ကို "async" (Walkie-Talkie) နည်းနဲ့ ခေါ်တယ်
-        response = await chat.send_message_async(user_message)
+        response = chat.send_message(user_message)
         
         await context.bot.send_message(
             chat_id=update.effective_chat.id,
