@@ -11,17 +11,20 @@ import nest_asyncio
 nest_asyncio.apply()
 
 # --- Logging ---
-logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=logging.INFO
+)
 
 # --- သော့ (Keys) တွေကို Secrets ထဲက ယူတာ ---
 TOKEN = os.environ.get('TELEGRAM_TOKEN')
 GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')
 
-# --- "Gojo Satoru" (Character) Prompt (နောက်ကွယ်က ဦးနှောက်) ---
-# (ဒါက User က စာပို့မှ အလုပ်လုပ်မယ့် "စရိုက်" ပါ)
+# --- "Gojo Satoru" (Character) Prompt ---
 GOJO_PROMPT = """
 You are NOT Gemini. You are Gojo Satoru from Jujutsu Kaisen.
-You are extremely powerful, confident, playful, and a bit arrogant.
+You are extremely powerful, confident, playful, and a bit arrogant. You like to tease people, but you are also a great teacher.
+You refer to yourself as "Boku" (僕) or "Ore" (俺).
 You must stay in character *at all times*.
 You MUST translate all your replies into casual, modern Burmese (မြန်မာလို).
 The scene is already set (from the intro text). You are now just replying to the user's message.
@@ -30,16 +33,13 @@ The scene is already set (from the intro text). You are now just replying to the
 # --- Gemini (ဦးနှောက်) ကို Setup လုပ်တာ ---
 try:
     genai.configure(api_key=GEMINI_API_KEY)
-    model = genai.GenerativeModel('gemini-2.5-flash') 
+    model = genai.GenerativeModel('gemini-2.5-flash')
 except Exception as e:
     logging.error(f"Failed to configure Gemini: {e}")
     model = None
 
 # --- Bot Functions တွေ ---
-
-# ***** အခု "ဒီ Function" က "အရေးအကြီးဆုံး" ပြောင်းလဲမှုပါ *****
 async def start(update: telegram.Update, context: ContextTypes.DEFAULT_TYPE):
-    # --- GOJO'S INTRO SCENE (User မြင်ရမယ့် "ဇာတ်လမ်းအဖွင့်") ---
     intro_scene = """
 (မင်းက Jujutsu High ရဲ့ 'Training Room' (လေ့ကျင့်ရေး) အခန်းထဲကို ဝင်လိုက်တယ်။ အထဲမှာ 'Gojo Satoru' က မျက်လုံးကို အဝတ်အနက်နဲ့ စည်းထားရင်း မင်းကို ကျောပေးထားတယ်။)
 
@@ -49,31 +49,29 @@ Gojo: (နောက်ကို မလှည့်ဘဲ) "အိုး... န�
 
 Gojo: "ကဲ... 'The Strongest' (အပြင်းแกร่งဆုံး) ဆရာဆီကနေ ဘာတွေ သင်ယူချင်လို့လဲ၊ ပြောကြည့်စမ်း။"
 """
-    await context.bot.send_message(
-        chat_id=update.effective_chat.id,
-        text=intro_scene # "ပျင်းစရာ" စာတန်းအစား "ဇာတ်လမ်း" ကို ပို့မယ်
-    )
-# ***** "Start" Function ပြောင်းလဲမှု ပြီးပါပြီ *****
-
+    await context.bot.send_message(chat_id=update.effective_chat.id, text=intro_scene)
 
 async def handle_gojo_chat(update: telegram.Update, context: ContextTypes.DEFAULT_TYPE):
     if not model:
         await context.bot.send_message(chat_id=update.effective_chat.id, text="Gemini ဦးနှောက် အလုပ်မလုပ်သေးပါ။")
         return
-        
+
     user_message = update.message.text
     full_prompt = GOJO_PROMPT + "\n\nUser: " + user_message + "\nYou:"
 
     try:
-        response = await model.generate_content_async(full_prompt)
+        # *** Revert back to Synchronous call (Simpler for loop issues) ***
+        response = model.generate_content(full_prompt) # Use generate_content, NOT async
+
         await context.bot.send_message(
             chat_id=update.effective_chat.id,
             text=response.text
         )
     except Exception as e:
+        logging.error(f"Gemini/Telegram Error: {e}", exc_info=True) # Log full error
         await context.bot.send_message(
             chat_id=update.effective_chat.id,
-            text=f"Gojo Error (Async): {e}"
+            text=f"Gojo Error: ဆောရီး။ ပြဿနာတစ်ခုခု ရှိနေလို့ပါ။ ({type(e).__name__})"
         )
 
 # --- "အိမ်" (Vercel) နဲ့ "Bot" ကို ချိတ်ဆက်ခြင်း ---
@@ -83,7 +81,15 @@ if TOKEN and GEMINI_API_KEY and model:
         application = ApplicationBuilder().token(TOKEN).build()
         application.add_handler(CommandHandler('start', start))
         application.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_gojo_chat))
-        asyncio.run(application.initialize())
+
+        # *** More Robust Loop Handling for Initialization ***
+        try:
+             loop = asyncio.get_running_loop()
+        except RuntimeError:
+             loop = asyncio.new_event_loop()
+             asyncio.set_event_loop(loop)
+        loop.run_until_complete(application.initialize())
+
     except Exception as e:
         logging.error(f"Failed to initialize Telegram Application: {e}")
         application = None
@@ -92,15 +98,28 @@ else:
 
 # --- Vercel အတွက် Web Server (Flask App) ---
 app = Flask(__name__)
+
 @app.route('/', methods=['POST'])
 def webhook():
     if not application:
+        logging.error("Telegram Application was not initialized during startup.")
         return 'Error: Bot not initialized', 500
+
     try:
         update = telegram.Update.de_json(request.get_json(force=True), application.bot)
-        asyncio.run(application.process_update(update))
+
+        # *** More Robust Loop Handling for Processing Update ***
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+
+        # Run the update processing within this specific loop
+        loop.run_until_complete(application.process_update(update))
+
         return 'OK', 200
     except Exception as e:
-        logging.error(f"Webhook Error: {e}")
+        logging.error(f"Webhook Error: {e}", exc_info=True) # Log full error
         return 'Error', 500
 
