@@ -3,3 +3,4 @@ google-generativeai
 flask
 packaging
 nest_asyncio
+redis
