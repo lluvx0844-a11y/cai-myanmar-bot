@@ -1,6 +1,6 @@
 python-telegram-bot
-google-generativeai
 flask
 packaging
 nest_asyncio
 redis
+google-generativeai
