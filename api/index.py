@@ -20,26 +20,18 @@ logger = logging.getLogger(__name__)
 
 # --- သော့ (Keys) တွေကို Secrets ထဲက ယူတာ ---
 TOKEN = os.environ.get('TELEGRAM_TOKEN')
-# (Admin Gemini Key ကို Vercel မှာ ထည့်စရာမလိုတော့ဘူး)
 
-# --- Database (Memory Bank) ကို ချိတ်ဆက်ခြင်း ---
+# --- Database (Memory Bank) ကို ချိတ်ဆက်ခြင်း (THE FIX) ---
 try:
-    # Vercel က "အလိုအလျောက်" ပေးထားတဲ့ KV (Redis) "သော့" တွေကို ယူတယ်
-    db_url = os.environ.get('UPSTASH_REDIS_REST_URL')
-    db_token = os.environ.get('UPSTASH_REDIS_REST_TOKEN')
+    # Vercel က "အလိုအလျောက်" ပေးထားတဲ့ "KV_URL" (သော့ အသစ်) ကို ယူတယ်
+    db_url = os.environ.get('KV_URL') 
     
-    if not db_url or not db_token:
-        logger.error("Database connection strings (UPSTASH) are missing!")
+    if not db_url:
+        logger.error("Database connection string (KV_URL) is missing!")
         db = None
     else:
-        # "Memory Bank" (Database) ကို အဆင်သင့်ဖွင့်ထားတယ်
-        db = redis.Redis(
-            host=db_url.split('://')[1].split(':')[0], # Host ကို ခွဲထုတ်တယ်
-            port=int(db_url.split(':')[-1]), # Port ကို ခွဲထုတ်တယ်
-            password=db_token,
-            ssl=True, # Vercel KV က SSL သုံးတယ်
-            decode_responses=True # "Byte" တွေအစား "String" တွေ ပြန်ယူဖို့
-        )
+        # "Memory Bank" (Database) ကို "KV_URL" နဲ့ "တိုက်ရိုက်" ဖွင့်တယ်
+        db = redis.from_url(db_url, decode_responses=True) # "redis-py" က URL ကို နားလည်တယ်
         db.ping()
         logger.info("Successfully connected to Vercel KV (Redis) Database.")
 except Exception as e:
@@ -55,7 +47,6 @@ You MUST translate all your replies into casual, modern Burmese (မြန်မ
 You MUST describe your actions or expressions using asterisks (*action*).
 The scene is already set (from the intro text). You are now just replying to the user's message.
 """
-    # (ဒီနေရာမှာ "Sukuna" "Lana del Rey" စသဖြင့် "Prompt" တွေ ထပ်ထည့်လို့ရတယ်)
 }
 
 # --- Bot Functions တွေ ---
@@ -134,7 +125,6 @@ async def handle_chat(update: telegram.Update, context: ContextTypes.DEFAULT_TYP
              character_prompt = PRESET_CHARACTERS[char_name]
              user_message = parts[1] if len(parts) > 1 else "" # Message ကို ယူ
         else:
-             # (နောက်မှ User ဖန်တီးထားတဲ့ Character တွေကို Database က ရှာမယ်)
              await update.message.reply_text(f"Error: Character '{char_name}' ကို ရှာမတွေ့ပါ။")
              return
     else:
@@ -143,17 +133,14 @@ async def handle_chat(update: telegram.Update, context: ContextTypes.DEFAULT_TYP
 
     # 3. "Gemini" ကို "User ရဲ့ Key" နဲ့ "သွားခေါ်"
     try:
-        # "User Key" နဲ့ "သီးသန့်" configure လုပ်တယ်
         genai.configure(api_key=user_key)
         temp_model = genai.GenerativeModel('gemini-1.0-pro')
-        
         full_prompt = character_prompt + "\n\nUser: " + user_message + "\nYou:"
-        response = temp_model.generate_content(full_prompt) # Use generate_content
+        response = temp_model.generate_content(full_prompt)
         
         await update.message.reply_text(response.text)
         
     except Exception as e:
-        # *** ဒါက "404 Error" ပြန်တက်လာမယ့် နေရာပါ ***
         logger.error(f"Gemini API Error for User {user_id}: {e}", exc_info=True)
         await update.message.reply_text(f"Gemini Error: {e}\n\n(သင့် API Key က ဒီ Model ကို သုံးခွင့် မရသေးတာ ဖြစ်နိုင်ပါတယ်။ Google AI Studio မှာ စစ်ဆေးပါ)")
 
@@ -191,4 +178,3 @@ def webhook():
     except Exception as e:
         logger.error(f"Webhook Error: {e}", exc_info=True)
         return 'Error', 500
-
