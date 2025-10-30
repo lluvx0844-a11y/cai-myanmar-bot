@@ -134,7 +134,7 @@ async def handle_chat(update: telegram.Update, context: ContextTypes.DEFAULT_TYP
     # 3. "Gemini" ကို "User ရဲ့ Key" နဲ့ "သွားခေါ်"
     try:
         genai.configure(api_key=user_key)
-        temp_model = genai.GenerativeModel('gemini-1.0-pro')
+        temp_model = genai.GenerativeModel('gemini-2.5-flash')
         full_prompt = character_prompt + "\n\nUser: " + user_message + "\nYou:"
         response = temp_model.generate_content(full_prompt)
         
