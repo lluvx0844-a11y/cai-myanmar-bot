@@ -2,65 +2,98 @@ import os
 import logging
 import google.generativeai as genai
 import telegram
-from telegram import Update, WebAppInfo
 from telegram.ext import Application, ApplicationBuilder, ContextTypes, CommandHandler, MessageHandler, filters
+from flask import Flask, request
 import asyncio
 import nest_asyncio
-import redis
-import json
+import redis # Database (Memory) လက်နက်
 
-# --- Event Loop Fix ---
+# --- Event Loop Fix (လိုင်းကျပ်တာ ဖြေရှင်းဖို့) ---
 nest_asyncio.apply()
 
 # --- Logging ---
-logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=logging.INFO
+)
 logger = logging.getLogger(__name__)
 
-# --- သော့ (Keys) ---
+# --- သော့ (Keys) တွေကို Secrets ထဲက ယူတာ ---
 TOKEN = os.environ.get('TELEGRAM_TOKEN')
-# Vercel URL ကို "Environment Variable" အဖြစ် "ကိုယ်တိုင်" ထည့်ရပါမယ်
-# (ဒါက အရေးကြီးတဲ့ အပြောင်းအလဲပါ)
-VERCEL_URL = os.environ.get('VERCEL_URL') 
+VERCEL_URL = os.environ.get('VERCEL_URL') # (ဒါက Mini App UI အတွက်)
 
-# --- Database (Memory) ---
+# --- Database (Memory Bank) ကို ချိတ်ဆက်ခြင်း (THE FIX) ---
 try:
-    db_url = os.environ.get('KV_URL')
-    if not db_url: logger.error("KV_URL is missing!"); db = None
+    # Vercel က "အလိုအလျောက်" ပေးထားတဲ့ "KV_URL" (သော့ အသစ်) ကို ယူတယ်
+    db_url = os.environ.get('KV_URL') 
+    
+    if not db_url:
+        logger.error("Database connection string (KV_URL) is missing!")
+        db = None
     else:
-        db = redis.from_url(db_url, decode_responses=True)
+        # "Memory Bank" (Database) ကို "KV_URL" နဲ့ "တိုက်ရိုက်" ဖွင့်တယ်
+        db = redis.from_url(db_url, decode_responses=True) # "redis-py" က URL ကို နားလည်တယ်
         db.ping()
-        logger.info("Successfully connected to Vercel KV Database.")
+        logger.info("Successfully connected to Vercel KV (Redis) Database.")
 except Exception as e:
-    logger.error(f"Failed to connect to Vercel KV: {e}"); db = None
+    logger.error(f"Failed to connect to Vercel KV (Redis): {e}")
+    db = None
 
-# --- Admin Characters ---
-PRESET_CHARACTERS = { "gojo": "You are Gojo Satoru..." } # (Code ကို ရှင်းအောင် ခဏ ချုံ့ထားတယ်)
+# --- Admin က ကြိုတင် Train ထားတဲ့ Character တွေ ---
+PRESET_CHARACTERS = {
+    "gojo": """You are Gojo Satoru from Jujutsu Kaisen.
+You are extremely powerful, confident, playful, and a bit arrogant. You like to tease people.
+You must stay in character *at all times*.
+You MUST translate all your replies into casual, modern Burmese (မြန်မာလို).
+You MUST describe your actions or expressions using asterisks (*action*).
+The scene is already set (from the intro text). You are now just replying to the user's message.
+"""
+}
 
 # --- Bot Functions တွေ ---
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+# "/start" (User အသစ် ဝင်လာရင်)
+async def start(update: telegram.Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_chat.id)
     user_key = None
-    if db: user_key = db.get(f"user:{user_id}:key")
-    
-    if not VERCEL_URL:
-        await update.message.reply_text("Error: VERCEL_URL is not set!")
-        return
-        
+    if db:
+        try:
+            user_key = db.get(f"user:{user_id}:key")
+        except Exception as e:
+            logger.error(f"DB read error on start: {e}")
+            
+    # "UI ခလုတ်" (Keyboard) ကို တည်ဆောက်တယ်
     keyboard = [
         [telegram.KeyboardButton(
             "💻 API Key (သော့) ထည့်/ပြင်ရန်", 
-            # "index.html" (UI) ကို ဖွင့်ပေးမယ့် "Mini App" ခလုတ်
             web_app=WebAppInfo(url=f"https://{VERCEL_URL}/index.html")
         )]
     ]
     reply_markup = telegram.ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-
+            
     if user_key:
-        await update.message.reply_text("ကြိုဆိုပါတယ်။ သင့် Key အဆင်သင့် ဖြစ်နေပါပြီ။", reply_markup=reply_markup)
+        await update.message.reply_text("ကြိုဆိုပါတယ်။ သင့် Gemini API Key က အဆင်သင့် ဖြစ်နေပါပြီ။\n\nCharacter တွေနဲ့ စကားပြောဖို့ `@gojo` (စသဖြင့်) လို့ ခေါ်လိုက်ပါ။\n\n(Key အသစ် ပြန်ထည့်ချင်ရင် အောက်က ခလုတ်ကို နှိပ်ပါ)", reply_markup=reply_markup)
     else:
-        await update.message.reply_text("မင်္ဂလာပါ။ Bot သုံးဖို့ 'API Key' ခလုတ်ကို နှိပ်ပြီး 'သော့' ကို မှတ်ပုံတင်ပါ။", reply_markup=reply_markup)
+        await update.message.reply_text(
+            "မင်္ဂလာပါ။ ဒါက Myanmar C.ai Bot ပါ။\n\n"
+            "ဒီ Bot ကို သုံးဖို့၊ သင့်မှာ 'Gemini API Key' (သော့) တစ်ခု ရှိဖို့ လိုပါတယ်။\n\n"
+            "အောက်က 'API Key' ခလုတ်ကို နှိပ်ပြီး 'သော့' ကို မှတ်ပုံတင်ပါ။",
+            reply_markup=reply_markup
+        )
 
-async def handle_web_app_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# "/getkey" (API Key ယူနည်း Tutorial)
+async def getkey(update: telegram.Update, context: ContextTypes.DEFAULT_TYPE):
+     await update.message.reply_text(
+        "Gemini API Key (သော့) ယူနည်း:\n\n"
+        "၁။ `aistudio.google.com` ကို သွားပါ။\n"
+        "၂။ Google နဲ့ ဝင်ပါ။\n"
+        "၃။ 'Get API Key' ကို နှိပ်ပါ။\n"
+        "၄။ 'Create new key' ကို နှိပ်ပါ။\n"
+        "၅။ ရလာတဲ့ 'Key' (AIzaSy...) ကို Copy ကူးပြီး Bot ဆီက 'UI Form' မှာ ပြန်လာထည့်ပါ။"
+    )
+
+# (User က "UI" ထဲက "Save" နှိပ်လိုက်ရင် "ဒီ Function" က အလုပ်လုပ်မယ်)
+async def handle_web_app_data(update: telegram.Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_chat.id)
     if not db:
         await update.message.reply_text("Error: Database (Memory) နဲ့ ချိတ်ဆက်မှု ကျသွားလို့ Key ကို မသိမ်းနိုင်သေးပါ။")
@@ -75,9 +108,11 @@ async def handle_web_app_data(update: Update, context: ContextTypes.DEFAULT_TYPE
     except Exception as e:
         await update.message.reply_text(f"Database Error: Key ကို မသိမ်းနိုင်ပါ။ {e}")
 
-async def handle_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# (User က Character Bot တွေကို ခေါ်တဲ့ အဓိက Function)
+async def handle_chat(update: telegram.Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_chat.id)
     user_message = update.message.text
+    
     if not db:
         await update.message.reply_text("Error: Database (Memory) နဲ့ ချိတ်ဆက်မှု ကျသွားလို့ပါ။")
         return
@@ -85,7 +120,7 @@ async def handle_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not user_key:
         await update.message.reply_text("Error: သင် 'API Key' မထည့်ရသေးပါ။\nအောက်က 'API Key' ခလုတ်ကို နှိပ်ပြီး အရင် ထည့်သွင်းပါ။")
         return
-    
+
     character_prompt = None
     if user_message.startswith("@"):
         parts = user_message.split(maxsplit=1)
@@ -100,7 +135,7 @@ async def handle_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
         genai.configure(api_key=user_key)
-        temp_model = genai.GenerativeModel('gemini-2.5-flash') # 1.5-flash ကိုပဲ ပြန်သုံးမယ်
+        temp_model = genai.GenerativeModel('gemini-2.5-flash') # 1.5-flash ကိုပဲ သုံးမယ်
         full_prompt = character_prompt + "\n\nUser: " + user_message + "\nYou:"
         response = temp_model.generate_content(full_prompt)
         await update.message.reply_text(response.text)
@@ -114,10 +149,12 @@ if TOKEN and db and VERCEL_URL:
     try:
         application = ApplicationBuilder().token(TOKEN).build()
         application.add_handler(CommandHandler('start', start))
+        application.add_handler(CommandHandler('getkey', getkey))
         application.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, handle_web_app_data))
         application.add_handler(MessageHandler(filters.Entity("mention"), handle_chat))
-        
-        loop = asyncio.get_event_loop()
+
+        try: loop = asyncio.get_running_loop()
+        except RuntimeError: loop = asyncio.new_event_loop(); asyncio.set_event_loop(loop)
         loop.run_until_complete(application.initialize())
     except Exception as e:
         logger.error(f"Failed to initialize Telegram Application: {e}")
@@ -125,25 +162,24 @@ if TOKEN and db and VERCEL_URL:
 else:
     logger.error("Missing TOKEN, DB, or VERCEL_URL.")
 
-# --- VOriginal Vercel Handler ---
-# (Flask App "လုံးဝ" (လုံးဝ) "မလို" တော့ပါဘူး)
-# Vercel က "api/index.py" ကို "တိုက်ရိုက်" ခေါ်ပါလိမ့်မယ်
-async def main(request: request):
-    if not application:
-        return 'Error: Bot not initialized', 500
+# --- Vercel အတွက် Web Server (Flask App) ---
+app = Flask(__name__)
+@app.route('/', methods=['POST'])
+def webhook():
+    if not application: return 'Error: Bot not initialized', 500
     try:
-        # Request body ကို "bytes" အဖြစ် ယူတယ်
-        data = await request.data
-        # "bytes" ကို "string" ပြောင်း၊ "string" ကို "json" (dict) ပြောင်း
-        update_json = json.loads(data.decode('utf-8'))
-        
-        update = telegram.Update.de_json(update_json, application.bot)
-        
-        # Bot ကို အလုပ်လုပ်ခိုင်းတယ်
-        await application.process_update(update)
-        
+        update = telegram.Update.de_json(request.get_json(force=True), application.bot)
+        try: loop = asyncio.get_running_loop()
+        except RuntimeError: loop = asyncio.new_event_loop(); asyncio.set_event_loop(loop)
+        loop.run_until_complete(application.process_update(update))
         return 'OK', 200
     except Exception as e:
         logger.error(f"Webhook Error: {e}", exc_info=True)
         return 'Error', 500
 
+# (User က "UI" (`index.html`) ကို "GET" နဲ့ "လာတောင်း" မယ့် နေရာ)
+@app.route('/index.html')
+def get_html_ui():
+    # "root" folder (တစ်ဆင့် အပေါ်) ထဲက `index.html` file ကို "ပို့" ပေးပါ
+    return send_from_directory('../', 'index.html')
+                
