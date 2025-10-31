@@ -47,7 +47,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("System Error: VERCEL_URL is not set!")
         return
         
-    keyboard = [[telegram.KeyboardButton("💻 API Key (သော့) ထည့်/ပြင်ရန်", web_app=WebAppInfo(url=f"https://{VERCEL_URL}/public/index.html"))]]
+    keyboard = [[telegram.KeyboardButton("💻 API Key (သော့) ထည့်/ပြင်ရန်", web_app=WebAppInfo(url=f"https://{VERCEL_URL}/index.html"))]]
     reply_markup = telegram.ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
             
     if user_key:
