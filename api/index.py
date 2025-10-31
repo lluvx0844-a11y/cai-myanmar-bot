@@ -148,7 +148,7 @@ else:
 app = Flask(__name__)
 
 # (Telegram က "POST" နဲ့ "ဘဲလ်တီး" မယ့် နေရာ)
-@app.route('/', methods=['POST'])
+@app.route('/api', methods=['POST'])
 def webhook():
     if not application: return 'Error: Bot not initialized', 500
     try:
