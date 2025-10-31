@@ -87,7 +87,7 @@ async def handle_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     character_prompt = None
-    if user_message.startswith("#"):
+    if user_message.startswith("@"):
         parts = user_message.split(maxsplit=1)
         char_name = parts[0][1:].lower()
         if char_name in PRESET_CHARACTERS:
