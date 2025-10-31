@@ -48,7 +48,7 @@ async def start(update: telegram.Update, context: ContextTypes.DEFAULT_TYPE):
         [telegram.KeyboardButton(
             "💻 API Key (သော့) ထည့်/ပြင်ရန်", 
             # "index.html" (UI) ကို ဖွင့်ပေးမယ့် "Mini App" ခလုတ်
-            web_app=WebAppInfo(url=f"https://{VERCEL_URL}/index.html")
+            web_app=WebAppInfo(url=f"https://{VERCEL_URL}/public/index.html")
         )]
     ]
     reply_markup = telegram.ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
@@ -165,4 +165,4 @@ def webhook():
 @app.route('/index.html')
 def get_html_ui():
     # "root" folder (သင့် project folder) ထဲက `index.html` file ကို "ပို့" ပေးပါ
-    return send_from_directory('.', 'index.html')
+    return send_from_directory('../public', 'index.html')
