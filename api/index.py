@@ -3,10 +3,11 @@ import logging
 import google.generativeai as genai
 import telegram
 from telegram.ext import Application, ApplicationBuilder, ContextTypes, CommandHandler, MessageHandler, filters
-from flask import Flask, request
+from flask import Flask, request, send_from_directory # <-- "send_from_directory" (HTML ပို့ဖို့)
 import asyncio
 import nest_asyncio
 import redis # Database (Memory) လက်နက်
+import json # <-- "Mini App" က ပို့တဲ့ Data ဖတ်ဖို့
 
 # --- Event Loop Fix (လိုင်းကျပ်တာ ဖြေရှင်းဖို့) ---
 nest_asyncio.apply()
@@ -25,13 +26,15 @@ VERCEL_URL = os.environ.get('VERCEL_URL') # (ဒါက Mini App UI အတွက�
 # --- Database (Memory Bank) ကို ချိတ်ဆက်ခြင်း (THE FIX) ---
 try:
     # Vercel က "အလိုအလျောက်" ပေးထားတဲ့ "KV_URL" (သော့ အသစ်) ကို ယူတယ်
-    db_url = os.environ.get('KV_URL') 
+    # Vercel က "KV_URL" "REDIS_URL" နှစ်မျိုး ပေးတတ်တယ်။ "KV_URL" က REST API အတွက်။
+    # "redis-py" library အတွက် "REDIS_URL" က ပို အဆင်ပြေတယ်။
+    db_url = os.environ.get('REDIS_URL') # <-- "KV_URL" အစား "REDIS_URL" ကို ပြောင်းသုံးပါ
     
     if not db_url:
-        logger.error("Database connection string (KV_URL) is missing!")
+        logger.error("Database connection string (REDIS_URL) is missing!")
         db = None
     else:
-        # "Memory Bank" (Database) ကို "KV_URL" နဲ့ "တိုက်ရိုက်" ဖွင့်တယ်
+        # "Memory Bank" (Database) ကို "REDIS_URL" နဲ့ "တိုက်ရိုက်" ဖွင့်တယ်
         db = redis.from_url(db_url, decode_responses=True) # "redis-py" က URL ကို နားလည်တယ်
         db.ping()
         logger.info("Successfully connected to Vercel KV (Redis) Database.")
@@ -135,7 +138,7 @@ async def handle_chat(update: telegram.Update, context: ContextTypes.DEFAULT_TYP
 
     try:
         genai.configure(api_key=user_key)
-        temp_model = genai.GenerativeModel('gemini-2.5-flash') # 1.5-flash ကိုပဲ သုံးမယ်
+        temp_model = genai.GenerativeModel('gemini-1.5-flash')
         full_prompt = character_prompt + "\n\nUser: " + user_message + "\nYou:"
         response = temp_model.generate_content(full_prompt)
         await update.message.reply_text(response.text)
@@ -182,4 +185,3 @@ def webhook():
 def get_html_ui():
     # "root" folder (တစ်ဆင့် အပေါ်) ထဲက `index.html` file ကို "ပို့" ပေးပါ
     return send_from_directory('../', 'index.html')
-                
