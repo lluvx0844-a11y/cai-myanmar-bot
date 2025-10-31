@@ -8,6 +8,7 @@ import asyncio
 import nest_asyncio
 import redis
 import json
+from flask import Flask, request, send_from_directory # <--- Flask ကို "UI" ပြဖို့ "တစ်ခုတည်း" အတွက်ပဲ သုံးမယ်
 
 # --- Event Loop Fix ---
 nest_asyncio.apply()
@@ -46,7 +47,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("System Error: VERCEL_URL is not set!")
         return
         
-    keyboard = [[telegram.KeyboardButton("💻 API Key (သော့) ထည့်/ပြင်ရန်", web_app=WebAppInfo(url=f"https://{VERCEL_URL}/public/index.html"))]]
+    keyboard = [[telegram.KeyboardButton("💻 API Key (သော့) ထည့်/ပြင်ရန်", web_app=WebAppInfo(url=f"https://{VERCEL_URL}/index.html"))]]
     reply_markup = telegram.ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
             
     if user_key:
@@ -108,12 +109,13 @@ async def handle_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # --- "အိမ်" (Vercel) နဲ့ "Bot" ကို ချိတ်ဆက်ခြင်း ---
 # (ဒါက Vercel က "အဓိက" ခေါ်မယ့် "တံခါးပေါက်" အစစ်ပါ)
 # (Flask App "လုံးဝ" (လုံးဝ) "မပါ" တော့ပါဘူး)
-async def main(request: request):
-    # Bot Application ကို "အစ" ကတည်းက "တည်ဆောက်" မယ်
-    if not TOKEN or not db or not VERCEL_URL:
-        logger.error("Missing TOKEN, DB, or VERCEL_URL.")
-        return 'Error: Bot not configured', 500
-        
+# --- Vercel အတွက် Web Server (Flask App) ---
+# (Flask ကို "UI" (`index.html`) "ပြ" ဖို့ နဲ့ "Webhook" "လက်ခံ" ဖို့ "၂ ခုလုံး" အတွက် "ပြန်သုံး" မယ်)
+app = Flask(__name__, static_folder='../public', static_url_path='')
+
+# --- Telegram Application Object ---
+application = None
+if TOKEN and db and VERCEL_URL:
     try:
         application = ApplicationBuilder().token(TOKEN).build()
         application.add_handler(CommandHandler('start', start))
@@ -122,20 +124,32 @@ async def main(request: request):
         application.add_handler(MessageHandler(filters.Entity("mention"), handle_chat))
         
         loop = asyncio.get_event_loop()
-        await application.initialize()
+        loop.run_until_complete(application.initialize())
     except Exception as e:
         logger.error(f"Failed to initialize Telegram Application: {e}")
-        return 'Error: Bot init failed', 500
+        application = None
+else:
+    logger.error("Missing TOKEN, DB, or VERCEL_URL.")
 
-    # Telegram က ပို့လိုက်တဲ့ "Data" ကို "လက်ခံ" ပြီး "အလုပ်လုပ်" မယ်
+# (Telegram က "POST" နဲ့ "ဘဲလ်တီး" မယ့် နေရာ)
+@app.route('/api/index', methods=['POST'])
+def webhook():
+    if not application: return 'Error: Bot not initialized', 500
     try:
-        data = await request.data
-        update_json = json.loads(data.decode('utf-8'))
-        update = telegram.Update.de_json(update_json, application.bot)
+        update = telegram.Update.de_json(request.get_json(force=True), application.bot)
         
-        await application.process_update(update)
+        try: loop = asyncio.get_running_loop()
+        except RuntimeError: loop = asyncio.new_event_loop(); asyncio.set_event_loop(loop)
+            
+        loop.run_until_complete(application.process_update(update))
         return 'OK', 200
     except Exception as e:
         logger.error(f"Webhook Error: {e}", exc_info=True)
         return 'Error', 500
-        
+
+# (User က "UI" (`index.html`) ကို "GET" နဲ့ "လာတောင်း" မယ့် နေရာ)
+@app.route('/index.html')
+def get_html_ui():
+    # "public" folder (တစ်ဆင့် အပေါ်) ထဲက `index.html` file ကို "ပို့" ပေးပါ
+    return send_from_directory('../public', 'index.html')
+
