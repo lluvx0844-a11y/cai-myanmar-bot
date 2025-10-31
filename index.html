@@ -1,1 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Set API Key</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        /* UI ကို "လှ" သွားအောင် လုပ်တဲ့ CSS */
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--tg-theme-bg-color, #212121);
+            color: var(--tg-theme-text-color, #FFFFFF);
+            padding: 20px;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        h1 {
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+        p {
+            font-size: 14px;
+            color: var(--tg-theme-hint-color, #AAAAAA);
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        input[type="text"] {
+            width: 90%;
+            padding: 12px;
+            font-size: 16px;
+            border: 1px solid var(--tg-theme-hint-color, #555);
+            border-radius: 8px;
+            background-color: var(--tg-theme-secondary-bg-color, #333);
+            color: var(--tg-theme-text-color, #FFFFFF);
+            margin-bottom: 20px;
+        }
+        button {
+            width: 90%;
+            padding: 14px;
+            font-size: 16px;
+            font-weight: bold;
+            border: none;
+            border-radius: 8px;
+            background-color: var(--tg-theme-button-color, #2481CC);
+            color: var(--tg-theme-button-text-color, #FFFFFF);
+            cursor: pointer;
+        }
+        #message {
+            margin-top: 15px;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>API Key (သော့) ထည့်ပါ</h1>
+    <p>သင့်ရဲ့ "Gemini API Key" (AIzaSy...) ကို ဒီအောက်မှာ Paste လုပ်ပြီး "Save" နှိပ်ပါ။ (သင့် Key ကို Private အဖြစ် သိမ်းဆည်းပါမယ်)။</p>
+
+    <input type="text" id="api_key_input" placeholder="AIzaSy...">
+    
+    <div id="main_button_placeholder"></div> 
+
+    <p id="message"></p>
+
+    <script>
+        // Telegram Mini App ကို "နိုး" လိုက်တယ်
+        const tg = window.Telegram.WebApp;
+        tg.ready();
+
+        const input = document.getElementById('api_key_input');
+        const message = document.getElementById('message');
+        
+        // Telegram ရဲ့ "Main Button" (အောက်ခြေက ခလုတ်) ကို ပြင်ဆင်တယ်
+        const mainButton = tg.MainButton;
+        mainButton.setText('Save Key (သော့ သိမ်းမည်)');
+        mainButton.show();
+
+        // "Save" ခလုတ်ကို နှိပ်ရင် ဘာလုပ်မလဲ
+        mainButton.onClick(function() {
+            const apiKey = input.value;
+
+            if (!apiKey || !apiKey.startsWith('AIzaSy')) {
+                message.textContent = "Error: Key က 'AIzaSy' နဲ့ စရပါမယ်။";
+                message.style.color = 'var(--tg-theme-destructive-text-color, red)';
+                return;
+            }
+
+            // "Saving..." လို့ ခဏ ပြမယ်
+            mainButton.showProgress(true);
+            message.textContent = "Saving... (သိမ်းဆည်းနေပါသည်...)";
+
+            // User ရဲ့ "API Key" ကို Telegram (Bot) ဆီကို "ပြန်ပို့" လိုက်တယ်
+            tg.sendData(apiKey);
+            
+            // "sendData" က App ကို "အလိုအလျောက်" (Auto) "မပိတ်" ပါဘူး။
+            // ဒါကြောင့် "သိမ်းပြီးပြီ" လို့ ပြောပြီးမှ "ပိတ်" မယ်။
+            setTimeout(function() {
+                mainButton.hideProgress();
+                message.textContent = "Success! (အောင်မြင်ပါတယ်!)";
+                message.style.color = 'lightgreen';
+                
+                // 3 စက္ကန့်နေရင် "Mini App" ကို "ပိတ်" လိုက်မယ်
+                setTimeout(function() {
+                    tg.close();
+                }, 1500);
+                
+            }, 1000);
+        });
+
+    </script>
+</body>
+</html>
 
