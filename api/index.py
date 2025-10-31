@@ -47,7 +47,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("System Error: VERCEL_URL is not set!")
         return
         
-    keyboard = [[telegram.KeyboardButton("💻 API Key (သော့) ထည့်/ပြင်ရန်", web_app=WebAppInfo(url=f"https://{VERCEL_URL}/index.html"))]]
+    keyboard = [[telegram.KeyboardButton("💻 API Key (သော့) ထည့်/ပြင်ရန်", web_app=WebAppInfo(url=f"https://{VERCEL_URL}/public/index.html"))]]
     reply_markup = telegram.ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
             
     if user_key:
@@ -129,7 +129,7 @@ app = Flask(__name__)
 
 # (Telegram က "POST" နဲ့ "ဘဲလ်တီး" မယ့် နေရာ)
 # (Webhook လိပ်စာက ".../api/index" ဖြစ်ရပါမယ်)
-@app.route('/', methods=['POST'])
+@app.route('/api/index', methods=['POST'])
 def webhook():
     if not application: return 'Error: Bot not initialized', 500
     try:
@@ -147,6 +147,6 @@ def webhook():
 # (User က "UI" (`index.html`) ကို "GET" နဲ့ "လာတောင်း" မယ့် နေရာ)
 @app.route('/index.html')
 def get_html_ui():
-    # "root" folder (တစ်ဆင့် အပေါ်) ထဲက `index.html` file ကို "ပို့" ပေးပါ
-    return send_from_directory('../', 'index.html')
-    
+    # "public" folder (တစ်ဆင့် အပေါ်) ထဲက `index.html` file ကို "ပို့" ပေးပါ
+    return send_from_directory('../public', 'index.html')
+            
