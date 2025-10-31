@@ -47,7 +47,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("System Error: VERCEL_URL is not set!")
         return
         
-    # "index.html" (UI) ကို "တိုက်ရိုက်" ခေါ်မယ် (public/ "မလို" တော့ဘူး)
+    # "public/" "မပါ" တော့ပါဘူး။ Vercel က "public" folder ကို "အလိုအလျောက်" ရှာပေးပါလိမ့်မယ်။
     keyboard = [[telegram.KeyboardButton("💻 API Key (သော့) ထည့်/ပြင်ရန်", web_app=WebAppInfo(url=f"https://{VERCEL_URL}/index.html"))]]
     reply_markup = telegram.ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
             
@@ -130,7 +130,7 @@ app = Flask(__name__)
 
 # (Telegram က "POST" နဲ့ "ဘဲလ်တီး" မယ့် နေရာ)
 # (Webhook လိပ်စာက ".../api/index" ဖြစ်ရပါမယ်)
-@app.route('/api/index', methods=['POST'])
+@app.route('/', methods=['POST'])
 def webhook():
     if not application: return 'Error: Bot not initialized', 500
     try:
@@ -146,8 +146,7 @@ def webhook():
         return 'Error', 500
 
 # (User က "UI" (`index.html`) ကို "GET" နဲ့ "လာတောင်း" မယ့် နေရာ)
-@app.route('/index.html')
-def get_html_ui():
-    # "root" folder (တစ်ဆင့် အပေါ်) ထဲက `index.html` file ကို "ပို့" ပေးပါ
-    return send_from_directory('../', 'index.html')
-    
+# (ဒါက "Vercel" က "အလိုအလျောက်" လုပ်ပေးမှာမို့ ဒီ Code "မလို" တော့ပါဘူး)
+# @app.route('/index.html')
+# def get_html_ui():
+#     return send_from_directory('../public', 'index.html')
