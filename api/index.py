@@ -2,13 +2,12 @@ import os
 import logging
 import google.generativeai as genai
 import telegram
-from telegram import Update, WebAppInfo # <-- "WebAppInfo" (UI ခေါ်ဖို့) ထပ်ထည့်တယ်
+from telegram import Update, WebAppInfo
 from telegram.ext import Application, ApplicationBuilder, ContextTypes, CommandHandler, MessageHandler, filters
-from flask import Flask, request, send_from_directory # <-- "send_from_directory" (HTML ပို့ဖို့) ထပ်ထည့်တယ်
 import asyncio
 import nest_asyncio
 import redis
-import json # <-- "Mini App" က ပို့တဲ့ Data ဖတ်ဖို့
+import json
 
 # --- Event Loop Fix ---
 nest_asyncio.apply()
@@ -19,7 +18,9 @@ logger = logging.getLogger(__name__)
 
 # --- သော့ (Keys) ---
 TOKEN = os.environ.get('TELEGRAM_TOKEN')
-VERCEL_URL = os.environ.get('VERCEL_URL') # <-- Vercel က "အလိုအလျောက်" ပေးတဲ့ "အိမ်လိပ်စာ"
+# Vercel URL ကို "Environment Variable" အဖြစ် "ကိုယ်တိုင်" ထည့်ရပါမယ်
+# (ဒါက အရေးကြီးတဲ့ အပြောင်းအလဲပါ)
+VERCEL_URL = os.environ.get('VERCEL_URL') 
 
 # --- Database (Memory) ---
 try:
@@ -35,15 +36,16 @@ except Exception as e:
 # --- Admin Characters ---
 PRESET_CHARACTERS = { "gojo": "You are Gojo Satoru..." } # (Code ကို ရှင်းအောင် ခဏ ချုံ့ထားတယ်)
 
-# --- Bot Functions ---
-
-# "/start" (User အသစ်)
-async def start(update: telegram.Update, context: ContextTypes.DEFAULT_TYPE):
+# --- Bot Functions တွေ ---
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_chat.id)
     user_key = None
     if db: user_key = db.get(f"user:{user_id}:key")
     
-    # "UI ခလုတ်" (Keyboard) ကို တည်ဆောက်တယ်
+    if not VERCEL_URL:
+        await update.message.reply_text("Error: VERCEL_URL is not set!")
+        return
+        
     keyboard = [
         [telegram.KeyboardButton(
             "💻 API Key (သော့) ထည့်/ပြင်ရန်", 
@@ -54,43 +56,26 @@ async def start(update: telegram.Update, context: ContextTypes.DEFAULT_TYPE):
     reply_markup = telegram.ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
     if user_key:
-        await update.message.reply_text(
-            "ကြိုဆိုပါတယ်။ သင့် Gemini API Key က အဆင်သင့် ဖြစ်နေပါပြီ။\n"
-            "Character တွေနဲ့ စကားပြောဖို့ `#gojo` လို့ ခေါ်လိုက်ပါ။",
-            reply_markup=reply_markup
-        )
+        await update.message.reply_text("ကြိုဆိုပါတယ်။ သင့် Key အဆင်သင့် ဖြစ်နေပါပြီ။", reply_markup=reply_markup)
     else:
-        await update.message.reply_text(
-            "မင်္ဂလာပါ။ ဒါက Myanmar C.ai Bot ပါ။\n\n"
-            "ဒီ Bot ကို သုံးဖို့၊ သင့်မှာ 'Gemini API Key' (သော့) တစ်ခု ရှိဖို့ လိုပါတယ်။\n"
-            "အောက်က 'API Key' ခလုတ်ကို နှိပ်ပြီး 'သော့' ကို မှတ်ပုံတင်ပါ။",
-            reply_markup=reply_markup # "ခလုတ်" ကိုပါ တစ်ခါတည်း ပို့တယ်
-        )
+        await update.message.reply_text("မင်္ဂလာပါ။ Bot သုံးဖို့ 'API Key' ခလုတ်ကို နှိပ်ပြီး 'သော့' ကို မှတ်ပုံတင်ပါ။", reply_markup=reply_markup)
 
-# (User က "UI" ထဲက "Save" နှိပ်လိုက်ရင် "ဒီ Function" က အလုပ်လုပ်မယ်)
-async def handle_web_app_data(update: telegram.Update, context: ContextTypes.DEFAULT_TYPE):
+async def handle_web_app_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_chat.id)
     if not db:
         await update.message.reply_text("Error: Database (Memory) နဲ့ ချိတ်ဆက်မှု ကျသွားလို့ Key ကို မသိမ်းနိုင်သေးပါ။")
         return
-        
     try:
-        # "UI" က ပို့လိုက်တဲ့ "API Key" (Data) ကို ယူတယ်
         user_key = update.message.web_app_data.data
-        
         if not user_key or not user_key.startswith("AIzaSy"):
              await update.message.reply_text("Error: Key ထည့်သွင်းပုံ မှားနေပါတယ်။ 'AIzaSy' နဲ့ စရပါမယ်။")
              return
-
-        # "Key" အသစ်ကို Database ထဲ "သိမ်း" လိုက်ပြီ
         db.set(f"user:{user_id}:key", user_key)
-        await update.message.reply_text("အောင်မြင်ပါတယ်။ သင့်ရဲ့ Gemini API Key ကို မှတ်ပုံတင်ပြီးပါပြီ။\nအခု Character တွေနဲ့ စကားစပြောနိုင်ပါပြီ။")
+        await update.message.reply_text("အောင်မြင်ပါတယ်။ သင့်ရဲ့ Gemini API Key ကို မှတ်ပုံတင်ပြီးပါပြီ။")
     except Exception as e:
         await update.message.reply_text(f"Database Error: Key ကို မသိမ်းနိုင်ပါ။ {e}")
 
-
-# (User က Character Bot တွေကို ခေါ်တဲ့ အဓိက Function)
-async def handle_chat(update: telegram.Update, context: ContextTypes.DEFAULT_TYPE):
+async def handle_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_chat.id)
     user_message = update.message.text
     if not db:
@@ -111,13 +96,11 @@ async def handle_chat(update: telegram.Update, context: ContextTypes.DEFAULT_TYP
         else:
              await update.message.reply_text(f"Error: Character '{char_name}' ကို ရှာမတွေ့ပါ။")
              return
-    else:
-        return # Chatroom -> Ignore
+    else: return
 
-    # 3. "Gemini" ကို "User ရဲ့ Key" နဲ့ "သွားခေါ်"
     try:
         genai.configure(api_key=user_key)
-        temp_model = genai.GenerativeModel('gemini-2.5-flash') # 1.5-flash ကိုပဲ သုံးမယ်
+        temp_model = genai.GenerativeModel('gemini-2.5-flash') # 1.5-flash ကိုပဲ ပြန်သုံးမယ်
         full_prompt = character_prompt + "\n\nUser: " + user_message + "\nYou:"
         response = temp_model.generate_content(full_prompt)
         await update.message.reply_text(response.text)
@@ -131,12 +114,10 @@ if TOKEN and db and VERCEL_URL:
     try:
         application = ApplicationBuilder().token(TOKEN).build()
         application.add_handler(CommandHandler('start', start))
-        # (Message Type အသစ်: "UI" က Data ပို့တာကို လက်ခံဖို့)
         application.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, handle_web_app_data))
         application.add_handler(MessageHandler(filters.Entity("mention"), handle_chat))
-
-        try: loop = asyncio.get_running_loop()
-        except RuntimeError: loop = asyncio.new_event_loop(); asyncio.set_event_loop(loop)
+        
+        loop = asyncio.get_event_loop()
         loop.run_until_complete(application.initialize())
     except Exception as e:
         logger.error(f"Failed to initialize Telegram Application: {e}")
@@ -144,26 +125,25 @@ if TOKEN and db and VERCEL_URL:
 else:
     logger.error("Missing TOKEN, DB, or VERCEL_URL.")
 
-# --- Vercel အတွက် Web Server (Flask App) ---
-app = Flask(__name__)
-
-# (Telegram က "POST" နဲ့ "ဘဲလ်တီး" မယ့် နေရာ)
-@app.route('/', methods=['POST'])
-def webhook():
-    if not application: return 'Error: Bot not initialized', 500
+# --- VOriginal Vercel Handler ---
+# (Flask App "လုံးဝ" (လုံးဝ) "မလို" တော့ပါဘူး)
+# Vercel က "api/index.py" ကို "တိုက်ရိုက်" ခေါ်ပါလိမ့်မယ်
+async def main(request: request):
+    if not application:
+        return 'Error: Bot not initialized', 500
     try:
-        update = telegram.Update.de_json(request.get_json(force=True), application.bot)
-        try: loop = asyncio.get_running_loop()
-        except RuntimeError: loop = asyncio.new_event_loop(); asyncio.set_event_loop(loop)
-        loop.run_until_complete(application.process_update(update))
+        # Request body ကို "bytes" အဖြစ် ယူတယ်
+        data = await request.data
+        # "bytes" ကို "string" ပြောင်း၊ "string" ကို "json" (dict) ပြောင်း
+        update_json = json.loads(data.decode('utf-8'))
+        
+        update = telegram.Update.de_json(update_json, application.bot)
+        
+        # Bot ကို အလုပ်လုပ်ခိုင်းတယ်
+        await application.process_update(update)
+        
         return 'OK', 200
     except Exception as e:
         logger.error(f"Webhook Error: {e}", exc_info=True)
         return 'Error', 500
-
-# (User က "UI" (`index.html`) ကို "GET" နဲ့ "လာတောင်း" မယ့် နေရာ)
-@app.route('/index.html')
-def get_html_ui():
-    # "root" folder (တစ်ဆင့် အပေါ်) ထဲက `index.html` file ကို "ပို့" ပေးပါ
-    return send_from_directory('../', 'index.html')
 
