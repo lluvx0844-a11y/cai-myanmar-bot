@@ -56,7 +56,7 @@ async def start(update: telegram.Update, context: ContextTypes.DEFAULT_TYPE):
     if user_key:
         await update.message.reply_text(
             "ကြိုဆိုပါတယ်။ သင့် Gemini API Key က အဆင်သင့် ဖြစ်နေပါပြီ။\n"
-            "Character တွေနဲ့ စကားပြောဖို့ `@gojo` လို့ ခေါ်လိုက်ပါ။",
+            "Character တွေနဲ့ စကားပြောဖို့ `#gojo` လို့ ခေါ်လိုက်ပါ။",
             reply_markup=reply_markup
         )
     else:
@@ -102,7 +102,7 @@ async def handle_chat(update: telegram.Update, context: ContextTypes.DEFAULT_TYP
         return
     
     character_prompt = None
-    if user_message.startswith("@"):
+    if user_message.startswith("#"):
         parts = user_message.split(maxsplit=1)
         char_name = parts[0][1:].lower()
         if char_name in PRESET_CHARACTERS:
@@ -164,6 +164,6 @@ def webhook():
 # (User က "UI" (`index.html`) ကို "GET" နဲ့ "လာတောင်း" မယ့် နေရာ)
 @app.route('/index.html')
 def get_html_ui():
-    # "root" folder (သင့် project folder) ထဲက `index.html` file ကို "ပို့" ပေးပါ
-    return send_from_directory('.', 'index.html')
-    
+    # "root" folder (တစ်ဆင့် အပေါ်) ထဲက `index.html` file ကို "ပို့" ပေးပါ
+    return send_from_directory('../', 'index.html')
+
